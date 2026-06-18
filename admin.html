@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#111;color:#e0e0e0;min-height:100vh}
+
+.login{position:fixed;inset:0;z-index:9999;background:#111;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.login h1{font-size:1.3rem;color:#fff;letter-spacing:1px}
+.login .sub{color:#555;font-size:.8rem}
+.login input{width:240px;padding:10px 14px;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;font-family:inherit;font-size:.9rem;outline:none;text-align:center}
+.login input:focus{border-color:#60cdff}
+.login button{padding:8px 28px;background:#0078d4;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:.85rem;font-weight:600;cursor:pointer;transition:background .15s}
+.login button:hover{background:#1a8ae8}
+
+.main{display:none}
+
+.header{padding:20px 24px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:1.2rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.header .badge{background:#0078d4;color:#fff;font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600}
+
+.controls{padding:16px 24px;display:flex;gap:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+.ctrl-btn{padding:8px 18px;border:1px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.04);color:#e0e0e0;font-family:inherit;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s}
+.ctrl-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25)}
+.ctrl-btn.danger{border-color:rgba(220,50,50,.3);color:#f66;background:rgba(220,50,50,.08)}
+.ctrl-btn.danger:hover{background:rgba(220,50,50,.18)}
+.ctrl-btn.success{border-color:rgba(50,200,80,.3);color:#6f6;background:rgba(50,200,80,.08)}
+.ctrl-btn.success:hover{background:rgba(50,200,80,.18)}
+
+.sites{padding:16px 24px;display:flex;flex-direction:column;gap:4px}
+
+.site-row{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;transition:all .15s}
+.site-row:hover{background:rgba(255,255,255,.07)}
+.site-row.disabled{opacity:.5}
+.site-row.disabled .site-name{text-decoration:line-through;color:#666}
+
+.site-left{display:flex;align-items:center;gap:14px}
+.site-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.site-info{display:flex;flex-direction:column;gap:2px}
+.site-name{font-size:.9rem;font-weight:600;color:#fff}
+.site-url{font-size:.72rem;color:#666;word-break:break-all}
+.site-cat{font-size:.65rem;color:#888;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px;display:inline-block}
+
+.toggle{width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;background:#333;position:relative;transition:background .2s;flex-shrink:0}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#888;transition:all .2s}
+.toggle.on{background:#0078d4}
+.toggle.on::after{left:23px;background:#fff}
+
+.status-bar{padding:12px 24px;background:rgba(255,255,255,.02);border-top:1px solid rgba(255,255,255,.06);position:fixed;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;font-size:.75rem;color:#666}
+.status-bar .ok{color:#6f6}
+.status-bar .off{color:#f66}
+
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;background:rgba(0,120,212,.9);color:#fff;border-radius:8px;font-size:.85rem;z-index:999;display:none;animation:slideIn .3s ease}
+@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <h1>ADMIN PANEL</h1>
+  <div class="sub">kdrsh portfolio</div>
+  <input type="password" id="pass" placeholder="Пароль" autofocus>
+  <button onclick="tryLogin()">Войти</button>
+</div>
+
+<div class="main" id="main">
+  <div class="header">
+    <h1>Admin Panel <span class="badge" id="countBadge">0 sites</span></h1>
+  </div>
+
+  <div style="display:flex;gap:0;padding:0 24px;border-bottom:1px solid rgba(255,255,255,.06)">
+    <button class="ctrl-btn tab-btn active" id="tab-sites" onclick="switchTab('sites')" style="border-radius:0;border-bottom:2px solid #0078d4;margin-bottom:-1px">Сайты</button>
+    <button class="ctrl-btn tab-btn" id="tab-monet" onclick="switchTab('monet')" style="border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px">Монетизация</button>
+    <button class="ctrl-btn tab-btn" id="tab-users" onclick="switchTab('users')" style="border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px">Пользователи</button>
+    <button class="ctrl-btn tab-btn" id="tab-donors" onclick="switchTab('donors')" style="border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px">Доска почёта</button>
+  </div>
+
+  <div id="section-sites">
+    <div class="controls">
+      <button class="ctrl-btn success" onclick="toggleAll(true)">Включить все</button>
+      <button class="ctrl-btn danger" onclick="toggleAll(false)">Выключить все</button>
+      <button class="ctrl-btn" onclick="loadSites()" style="margin-left:auto">Обновить</button>
+    </div>
+    <div class="sites" id="sitesList"></div>
+  </div>
+
+  <div id="section-monet" style="display:none">
+    <div class="controls">
+      <button class="ctrl-btn success" onclick="monetToggleAll(true)">Включить все</button>
+      <button class="ctrl-btn danger" onclick="monetToggleAll(false)">Выключить все</button>
+      <button class="ctrl-btn" onclick="loadMonet()" style="margin-left:auto">Обновить</button>
+    </div>
+    <div class="sites" id="monetList"></div>
+  </div>
+
+  <div id="section-users" style="display:none">
+    <div class="controls">
+      <input type="text" id="grantId" placeholder="Telegram ID" style="flex:0 0 160px;padding:8px 14px;border:1px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.04);color:#e0e0e0;font-family:inherit;font-size:.85rem;outline:none">
+      <button class="ctrl-btn success" onclick="grantAccess()">TG доступ</button>
+      <input type="text" id="grantTw" placeholder="Twitch login" style="flex:0 0 160px;padding:8px 14px;border:1px solid rgba(145,70,255,.35);border-radius:8px;background:rgba(145,70,255,.08);color:#e0e0e0;font-family:inherit;font-size:.85rem;outline:none">
+      <button class="ctrl-btn success" style="background:#9146ff;border-color:#9146ff" onclick="grantTwitchAccess()">Twitch доступ</button>
+      <button class="ctrl-btn" onclick="loadUsers()" style="margin-left:auto">Обновить</button>
+    </div>
+    <div class="sites" id="usersList"></div>
+  </div>
+
+  <div id="section-donors" style="display:none">
+    <div class="controls" style="flex-wrap:wrap;gap:8px">
+      <input type="text" id="donorName" placeholder="Имя" style="flex:0 0 160px;padding:8px 14px;border:1px solid rgba(255,215,0,.35);border-radius:8px;background:rgba(255,215,0,.05);color:#e0e0e0;font-family:inherit;font-size:.85rem;outline:none">
+      <input type="number" id="donorAmount" placeholder="Сумма ₽" min="0" step="1" style="flex:0 0 120px;padding:8px 14px;border:1px solid rgba(255,215,0,.35);border-radius:8px;background:rgba(255,215,0,.05);color:#e0e0e0;font-family:inherit;font-size:.85rem;outline:none">
+      <input type="text" id="donorNote" placeholder="Комментарий (опц.)" style="flex:1 1 200px;padding:8px 14px;border:1px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.04);color:#e0e0e0;font-family:inherit;font-size:.85rem;outline:none">
+      <button class="ctrl-btn success" style="background:#facc15;color:#000;border-color:#facc15" onclick="addDonor()">+ Добавить</button>
+      <button class="ctrl-btn" onclick="loadDonors()" style="margin-left:auto">Обновить</button>
+    </div>
+    <div style="padding:8px 24px;color:#888;font-size:.8rem">Сортировка по сумме (по убыванию). Доска почёта отображается на главной портфолио в стиле кинотитров.</div>
+    <div class="sites" id="donorsList"></div>
+  </div>
+
+  <div class="status-bar">
+    <span id="statusText">Loading...</span>
+    <span id="statusCounts"></span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const APPS=[
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M6 9h2v2H6V9zm4 0h2v2h-2V9zm8-4H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 12H4V7h16v10zm-6-6h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h6v2h-6v-2zm-8 0h2v2H4v-2zm4 0h2v2H8v-2z"/></svg>',bg:'#4c3d99',name:'Chat Quiz',url:'https://quizkdrsh.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>',bg:'#2a6b65',name:'Twitch City',url:'https://twitch-sity.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M7 5h2V3H7v2zm0 8h2v-2H7v2zm0 8h2v-2H7v2zm4-4h2v-2h-2v2zm0 4h2v-2h-2v2zm-8 0h2v-2H3v2zm0-4h2v-2H3v2zm0-4h2v-2H3v2zm0-4h2V7H3v2zm0-4h2V3H3v2zm8 8h2v-2h-2v2zm8 4h2v-2h-2v2zm0-4h2v-2h-2v2zm0 8h2v-2h-2v2zm0-12h2V7h-2v2zm-8-4h2V3h-2v2zm8-2v2h2V3h-2zm-8 12h2v-2h-2v2zm4 4h2v-2h-2v2zm0-8h2v-2h-2v2zm0-4h2V7h-2v2z"/></svg>',bg:'#993d4d',name:'Chat vs Boss',url:'https://chat-boss-jet.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>',bg:'#5a4d8a',name:'Song Battle',url:'https://songbattle-xi.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>',bg:'#994d1a',name:'AI Roast',url:'https://ai-roast-beta.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M11.25 6a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5H12a.75.75 0 0 1-.75-.75zM12 1a5 5 0 0 0-5 5c0 .862.218 1.674.603 2.382l-4.95 8.572a2 2 0 0 0 1.732 3H19.62a2 2 0 0 0 1.73-3l-4.95-8.572A4.97 4.97 0 0 0 17 6a5 5 0 0 0-5-5zm-3 5a3 3 0 1 1 6 0 3 3 0 0 1-6 0z"/></svg>',bg:'#992a2a',name:'Bomb Defuse',url:'https://bomb-defuse-delta.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zM5.08 16h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 0 1 5.08 16zm0-8a7.987 7.987 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8H5.08zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>',bg:'#8a7a2a',name:'Поле Чудес',url:'https://pole-chudes-seven.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>',bg:'#2a8a6a',name:'Guess Word',url:'https://guess-word-puce.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2.12 14.35c-.82.15-1.63-.53-1.63-1.38 0-.63.42-1.16 1-1.32V9.14c-.59-.18-1-.7-1-1.32 0-.84.81-1.53 1.63-1.38 1.17.21 2.03 1.45 1.37 2.65l3.5 2.02c.66-1.21 2.51-1.07 2.93.26.3.96-.34 2.13-1.58 2.13-.74 0-1.28-.38-1.54-.94L11 14.54c.2.54.11 1.27-.12 1.81z"/></svg>',bg:'#2a5a8a',name:'Chat Fishing',url:'https://fishing-sandy.vercel.app'},
+  {cat:'fun',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H11.1v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.25c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.72-2.74 0-2.22-1.9-2.97-3.86-3.45z"/></svg>',bg:'#7a7a2a',name:'Coin Flip',url:'https://coinflip-six-cyan.vercel.app'},
+  {cat:'fun',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.5 12a1.5 1.5 0 0 1-1.5-1.5A1.5 1.5 0 0 1 17.5 9a1.5 1.5 0 0 1 1.5 1.5 1.5 1.5 0 0 1-1.5 1.5m-3-4A1.5 1.5 0 0 1 13 6.5 1.5 1.5 0 0 1 14.5 5 1.5 1.5 0 0 1 16 6.5 1.5 1.5 0 0 1 14.5 8m-5 0A1.5 1.5 0 0 1 8 6.5 1.5 1.5 0 0 1 9.5 5 1.5 1.5 0 0 1 11 6.5 1.5 1.5 0 0 1 9.5 8m-3 4A1.5 1.5 0 0 1 5 10.5 1.5 1.5 0 0 1 6.5 9 1.5 1.5 0 0 1 8 10.5 1.5 1.5 0 0 1 6.5 12M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>',bg:'#555',name:'Pixel Battle',url:'https://pixel-battle-sage.vercel.app'},
+  {cat:'fun',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M13 1.07V9h7c0-4.08-3.05-7.44-7-7.93zM4 15c0 4.42 3.58 8 8 8s8-3.58 8-8v-4H4v4zm7-13.93C7.05 1.56 4 4.92 4 9h7V1.07z"/></svg>',bg:'#5a3d99',name:'Кликер',url:'https://stimulation-chi.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3l2 5h5l-4 3 1.5 5L12 15l-4.5 3L9 13l-4-3h5l2-5z"/></svg>',bg:'#22c55e',name:'Контекст',url:'https://kontext-twitch.vercel.app'},
+  {cat:'tools',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M14 6H2v2h12V6zm0 4H2v2h12v-2zM2 16h8v-2H2v2zm19.5-4.5L23 13l-6.99 7-4.51-4.5L13 14l3.01 3 5.49-5.5z"/></svg>',bg:'#a855f7',name:'Track Queue',url:'https://track-queue.vercel.app'},
+  {cat:'tools',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>',bg:'#8a3d3d',name:'Аукцион',url:'https://auction-ten-bay.vercel.app'},
+  {cat:'tools',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/></svg>',bg:'#8a5a1a',name:'Giveaway',url:'https://giveaway-one-jet.vercel.app'},
+  {cat:'tools',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>',bg:'#8a2a2a',name:'OBS Timer',url:'https://obs-timer-inky.vercel.app'},
+  {cat:'tools',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>',bg:'#6a2a7a',name:'First Message',url:'https://first-msg.vercel.app'},
+  {cat:'tools',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>',bg:'#7a6a1a',name:'Custom Chat',url:'https://custom-chat-dusky.vercel.app'},
+  {cat:'fun',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>',bg:'#7b7bff',name:'Нить',url:'https://nit-drab.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',bg:'#9146ff',name:'Гляделки',url:'https://glyadelki.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>',bg:'#22c55e',name:'ГеоБитва',url:'https://geobitva.vercel.app'},
+  {cat:'fun',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm.01 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13l4 5h-3v4h-2v-4H6l5-5z"/></svg>',bg:'#facc15',name:'Скорость реакции',url:'https://reaction-kdrsh.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>',bg:'#3b82f6',name:'Флаги',url:'https://flagi-kdrsh.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a3 3 0 1 0 3 3 3 3 0 0 0-3-3zm9 7H3v2h6.32L9 22h2l1-7 1 7h2L14.68 11H21z"/></svg>',bg:'#fb923c',name:'Виселица',url:'https://viselica-kdrsh.vercel.app'},
+  {cat:'tools',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.5 16l-4-4 1.41-1.41L10.5 14.17l5.59-5.59L17.5 10l-7 7z"/></svg>',bg:'#9146ff',name:'Анбан LIVE',url:'https://anban-live.vercel.app'},
+  {cat:'link',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.53 8.15l-1.8 8.47c-.13.6-.48.75-.98.47l-2.72-2-1.31 1.26c-.15.15-.27.27-.55.27l.2-2.77 5.02-4.54c.22-.2-.05-.3-.34-.12l-6.2 3.9-2.67-.83c-.58-.18-.59-.58.12-.86l10.44-4.02c.48-.18.91.12.75.86z"/></svg>',bg:'#2AABEE',name:'Telegram',url:'https://t.me/mypodvalq'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>',bg:'#0d2a0d',name:'Доксинг',url:'https://doxxing-kdrsh.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M3 5h18v2H3zm0 6h12v2H3zm0 6h18v2H3z"/></svg>',bg:'#7c3aed',name:'Стихи из чата',url:'https://poem-kdrsh.vercel.app'},
+  {cat:'games',icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>',bg:'#ff6b35',name:'Смехлыст',url:'https://smehlyst.vercel.app'},
+];
+
+let pass = '';
+let sites = {};
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2000);
+}
+
+async function api(body) {
+  const r = await fetch('https://portfolio-sigma-roan-72.vercel.app/api/sites', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pass, ...body }),
+  });
+  return r.json();
+}
+
+function tryLogin() {
+  pass = document.getElementById('pass').value.trim();
+  if (!pass) return;
+  loadSites();
+}
+
+async function loadSites() {
+  try {
+    // initialize sites if needed
+    const names = APPS.map(a => a.name);
+    const res = await api({ action: 'init', names });
+    if (res.error) {
+      alert('Неверный пароль');
+      return;
+    }
+    sites = res.sites;
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    localStorage.setItem('admin_pass', pass);
+    renderSites();
+  } catch (e) {
+    alert('Ошибка подключения');
+  }
+}
+
+function renderSites() {
+  const list = document.getElementById('sitesList');
+  list.innerHTML = '';
+
+  let onCount = 0;
+  let offCount = 0;
+
+  APPS.forEach(app => {
+    const enabled = sites[app.name] !== false;
+    if (enabled) onCount++; else offCount++;
+
+    const row = document.createElement('div');
+    row.className = 'site-row' + (enabled ? '' : ' disabled');
+    row.innerHTML = `
+      <div class="site-left">
+        <div class="site-icon" style="background:${app.bg}">${app.icon}</div>
+        <div class="site-info">
+          <div class="site-name">${app.name}</div>
+          <div class="site-url">${app.url}</div>
+          <span class="site-cat">${app.cat}</span>
+        </div>
+      </div>
+      <button class="toggle${enabled ? ' on' : ''}" data-name="${app.name}"></button>
+    `;
+
+    const toggle = row.querySelector('.toggle');
+    toggle.addEventListener('click', () => toggleSite(app.name, !enabled));
+    list.appendChild(row);
+  });
+
+  document.getElementById('countBadge').textContent = APPS.length + ' sites';
+  document.getElementById('statusText').innerHTML =
+    '<span class="ok">' + onCount + ' online</span> · <span class="off">' + offCount + ' offline</span>';
+  document.getElementById('statusCounts').textContent = 'Total: ' + APPS.length;
+}
+
+async function toggleSite(name, enabled) {
+  const res = await api({ action: 'toggle', site: name, enabled });
+  if (res.ok) {
+    sites = res.sites;
+    renderSites();
+    toast(name + (enabled ? ' — включён' : ' — выключен'));
+  }
+}
+
+async function toggleAll(on) {
+  const res = await api({ action: on ? 'all_on' : 'all_off' });
+  if (res.ok) {
+    sites = res.sites;
+    renderSites();
+    toast(on ? 'Все сайты включены' : 'Все сайты выключены');
+  }
+}
+
+/* ── TABS ── */
+function switchTab(tab) {
+  document.getElementById('section-sites').style.display = tab === 'sites' ? '' : 'none';
+  document.getElementById('section-monet').style.display = tab === 'monet' ? '' : 'none';
+  document.getElementById('section-users').style.display = tab === 'users' ? '' : 'none';
+  document.getElementById('section-donors').style.display = tab === 'donors' ? '' : 'none';
+  ['sites','monet','users','donors'].forEach(t => {
+    const btn = document.getElementById('tab-'+t);
+    btn.classList.toggle('active', t === tab);
+    btn.style.borderBottomColor = t === tab ? '#0078d4' : 'transparent';
+  });
+  if (tab === 'monet' && !monetLoaded) loadMonet();
+  if (tab === 'users' && !usersLoaded) loadUsers();
+  if (tab === 'donors' && !donorsLoaded) loadDonors();
+}
+
+/* ── DONORS ── */
+let donorsList = [];
+let donorsLoaded = false;
+
+async function loadDonors() {
+  try {
+    const r = await fetch('https://portfolio-sigma-roan-72.vercel.app/api/donors');
+    const d = await r.json();
+    donorsList = d.donors || [];
+    donorsLoaded = true;
+    renderDonors();
+  } catch (e) { alert('Ошибка загрузки доски: ' + e.message); }
+}
+
+async function donorApi(body) {
+  const r = await fetch('https://portfolio-sigma-roan-72.vercel.app/api/donors', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pass, ...body }),
+  });
+  return r.json();
+}
+
+async function addDonor() {
+  const name = document.getElementById('donorName').value.trim();
+  const amount = parseInt(document.getElementById('donorAmount').value, 10);
+  const note = document.getElementById('donorNote').value.trim();
+  if (!name) { alert('Введи имя'); return; }
+  if (isNaN(amount) || amount < 0) { alert('Введи сумму'); return; }
+  const r = await donorApi({ action: 'add', name, amount, note });
+  if (r.error) { alert(r.error); return; }
+  document.getElementById('donorName').value = '';
+  document.getElementById('donorAmount').value = '';
+  document.getElementById('donorNote').value = '';
+  donorsList = r.list || [];
+  renderDonors();
+  toast('Добавлено: ' + name + ' — ' + amount + '₽');
+}
+
+async function updateDonor(id, field, value) {
+  const body = { action: 'update', id };
+  if (field === 'amount') body.amount = parseInt(value, 10) || 0;
+  else if (field === 'name') body.name = value;
+  else if (field === 'note') body.note = value;
+  const r = await donorApi(body);
+  if (r.error) { alert(r.error); return; }
+  donorsList = r.list || [];
+  renderDonors();
+  toast('Обновлено');
+}
+
+async function deleteDonor(id, name) {
+  if (!confirm('Удалить «' + name + '» из доски почёта?')) return;
+  const r = await donorApi({ action: 'delete', id });
+  if (r.error) { alert(r.error); return; }
+  donorsList = r.list || [];
+  renderDonors();
+  toast('Удалено');
+}
+
+function renderDonors() {
+  const list = document.getElementById('donorsList');
+  if (donorsList.length === 0) {
+    list.innerHTML = '<div style="padding:32px;text-align:center;color:#666">Доска пуста. Добавь первого донатера через форму выше.</div>';
+    return;
+  }
+  const sorted = [...donorsList].sort((a, b) => (b.amount || 0) - (a.amount || 0));
+  const total = sorted.reduce((s, d) => s + (d.amount || 0), 0);
+  list.innerHTML = '<div style="padding:10px 24px;color:#facc15;font-weight:700">Всего: ' + total + '₽ от ' + sorted.length + ' человек</div>' +
+    sorted.map((d, i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
+      return '<div class="site-row" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.04)">' +
+        '<div style="font-weight:900;color:#facc15;width:38px">' + medal + '</div>' +
+        '<input type="text" value="' + escapeAttr(d.name) + '" onblur="updateDonor(\'' + d.id + '\',\'name\',this.value)" style="flex:1;padding:6px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-family:inherit;font-size:.85rem">' +
+        '<input type="number" value="' + (d.amount || 0) + '" onblur="updateDonor(\'' + d.id + '\',\'amount\',this.value)" style="width:100px;padding:6px 10px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:6px;color:#facc15;font-weight:700;font-family:inherit;font-size:.85rem;text-align:right">' +
+        '<span style="color:#888">₽</span>' +
+        '<input type="text" value="' + escapeAttr(d.note || '') + '" placeholder="комментарий" onblur="updateDonor(\'' + d.id + '\',\'note\',this.value)" style="flex:1;padding:6px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#aaa;font-family:inherit;font-size:.8rem">' +
+        '<button class="ctrl-btn danger" onclick="deleteDonor(\'' + d.id + '\',\'' + escapeAttr(d.name) + '\')" style="padding:6px 10px;font-size:.75rem">✕</button>' +
+        '</div>';
+    }).join('');
+}
+
+function escapeAttr(s) { return String(s||'').replace(/"/g, '&quot;').replace(/'/g, '\\\''); }
+
+/* ── USERS ── */
+const USERS_API = 'https://quizkdrsh.vercel.app/api/users';
+let usersList = [];
+let twitchList = [];
+let usersLoaded = false;
+
+async function loadUsers() {
+  try {
+    const r = await fetch(USERS_API + '?pass=' + encodeURIComponent(pass));
+    const d = await r.json();
+    if (d.error) { alert('Ошибка: ' + d.error); return; }
+    usersList = d.users || [];
+    twitchList = d.twitch || [];
+    usersLoaded = true;
+    renderUsers();
+  } catch (e) { alert('Ошибка сети'); }
+}
+
+function renderUsers() {
+  const list = document.getElementById('usersList');
+  list.innerHTML = '';
+  if (usersList.length === 0 && twitchList.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#666;padding:40px;font-size:.9rem">Нет пользователей с доступом</div>';
+    return;
+  }
+  // Twitch users first (more prominent)
+  if (twitchList.length > 0) {
+    const h1 = document.createElement('div');
+    h1.style.cssText = 'color:#bf94ff;font-size:.75rem;text-transform:uppercase;letter-spacing:2px;padding:8px 4px;font-weight:700';
+    h1.textContent = 'Twitch (' + twitchList.length + ')';
+    list.appendChild(h1);
+    twitchList.forEach(login => {
+      const row = document.createElement('div');
+      row.className = 'site-row';
+      row.innerHTML = `
+        <div class="site-left">
+          <div class="site-icon" style="background:rgba(145,70,255,.2);color:#bf94ff;font-size:.9rem;font-weight:900">TW</div>
+          <div class="site-info">
+            <div class="site-name">${login}</div>
+            <a class="site-url" href="https://twitch.tv/${login}" target="_blank" style="color:#bf94ff;text-decoration:none">twitch.tv/${login}</a>
+          </div>
+        </div>
+        <button class="ctrl-btn danger" style="padding:6px 16px">Снять доступ</button>
+      `;
+      row.querySelector('button').addEventListener('click', () => revokeTwitchAccess(login));
+      list.appendChild(row);
+    });
+  }
+  if (usersList.length > 0) {
+    const h2 = document.createElement('div');
+    h2.style.cssText = 'color:#60cdff;font-size:.75rem;text-transform:uppercase;letter-spacing:2px;padding:16px 4px 8px;font-weight:700';
+    h2.textContent = 'Telegram (' + usersList.length + ')';
+    list.appendChild(h2);
+    usersList.forEach(uid => {
+      const row = document.createElement('div');
+      row.className = 'site-row';
+      row.innerHTML = `
+        <div class="site-left">
+          <div class="site-icon" style="background:rgba(0,120,212,.2);color:#60cdff;font-size:.9rem;font-weight:900">TG</div>
+          <div class="site-info">
+            <div class="site-name">${uid}</div>
+            <a class="site-url" href="tg://user?id=${uid}" style="color:#60cdff;text-decoration:none">Открыть в Telegram</a>
+          </div>
+        </div>
+        <button class="ctrl-btn danger" style="padding:6px 16px">Снять доступ</button>
+      `;
+      row.querySelector('button').addEventListener('click', () => revokeAccess(uid));
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('statusText').innerHTML = '<span style="color:#60cdff">' + usersList.length + ' TG</span> · <span style="color:#bf94ff">' + twitchList.length + ' Twitch</span>';
+}
+
+async function grantAccess() {
+  const id = document.getElementById('grantId').value.trim();
+  if (!id) { alert('Введи Telegram ID'); return; }
+  try {
+    const r = await fetch(USERS_API, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pass, action: 'grant', telegramId: id })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast('TG доступ выдан: ' + id);
+      document.getElementById('grantId').value = '';
+      loadUsers();
+    } else alert('Ошибка: ' + (d.error || 'unknown'));
+  } catch (e) { alert('Ошибка сети'); }
+}
+
+async function grantTwitchAccess() {
+  const login = document.getElementById('grantTw').value.trim().toLowerCase();
+  if (!login) { alert('Введи Twitch login'); return; }
+  try {
+    const r = await fetch(USERS_API, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pass, action: 'grant', twitchLogin: login })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast('Twitch доступ выдан: ' + login);
+      document.getElementById('grantTw').value = '';
+      loadUsers();
+    } else alert('Ошибка: ' + (d.error || 'unknown'));
+  } catch (e) { alert('Ошибка сети'); }
+}
+
+async function revokeAccess(uid) {
+  if (!confirm('Снять TG доступ у ' + uid + '?')) return;
+  try {
+    const r = await fetch(USERS_API, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pass, action: 'revoke', telegramId: uid })
+    });
+    const d = await r.json();
+    if (d.ok) { toast('TG доступ снят: ' + uid); loadUsers(); }
+    else alert('Ошибка: ' + (d.error || 'unknown'));
+  } catch (e) { alert('Ошибка сети'); }
+}
+
+async function revokeTwitchAccess(login) {
+  if (!confirm('Снять Twitch доступ у ' + login + '?')) return;
+  try {
+    const r = await fetch(USERS_API, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pass, action: 'revoke', twitchLogin: login })
+    });
+    const d = await r.json();
+    if (d.ok) { toast('Twitch доступ снят: ' + login); loadUsers(); }
+    else alert('Ошибка: ' + (d.error || 'unknown'));
+  } catch (e) { alert('Ошибка сети'); }
+}
+
+/* ── MONETIZATION ── */
+const MONET_API = 'https://quizkdrsh.vercel.app/api/monetization';
+let monetSites = {};
+let monetLoaded = false;
+
+async function monetApi(body) {
+  const r = await fetch(MONET_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pass, ...body }),
+  });
+  return r.json();
+}
+
+async function loadMonet() {
+  try {
+    const names = APPS.map(a => a.name);
+    const res = await monetApi({ action: 'init', names });
+    if (res.error) return;
+    monetSites = res.sites;
+    monetLoaded = true;
+    renderMonet();
+  } catch (e) {}
+}
+
+function renderMonet() {
+  const list = document.getElementById('monetList');
+  list.innerHTML = '';
+  let onCount = 0, offCount = 0;
+
+  APPS.forEach(app => {
+    const enabled = monetSites[app.name] === true;
+    if (enabled) onCount++; else offCount++;
+
+    const row = document.createElement('div');
+    row.className = 'site-row' + (enabled ? '' : ' disabled');
+    row.innerHTML = `
+      <div class="site-left">
+        <div class="site-icon" style="background:${app.bg}">${app.icon}</div>
+        <div class="site-info">
+          <div class="site-name">${app.name}</div>
+          <div class="site-url">${app.url}</div>
+          <span class="site-cat" style="background:${enabled ? 'rgba(255,215,0,.12)' : 'rgba(255,255,255,.06)'};color:${enabled ? '#ffd700' : '#888'}">
+            ${enabled ? 'paywall' : 'free'}
+          </span>
+        </div>
+      </div>
+      <button class="toggle${enabled ? ' on' : ''}" data-name="${app.name}"></button>
+    `;
+    const toggle = row.querySelector('.toggle');
+    toggle.addEventListener('click', () => monetToggle(app.name, !enabled));
+    list.appendChild(row);
+  });
+
+  document.getElementById('statusText').innerHTML =
+    '<span style="color:#ffd700">' + onCount + ' paywall</span> · <span class="ok">' + offCount + ' free</span>';
+}
+
+async function monetToggle(name, enabled) {
+  const res = await monetApi({ action: 'toggle', site: name, enabled });
+  if (res.ok) {
+    monetSites = res.sites;
+    renderMonet();
+    toast(name + (enabled ? ' — paywall ON' : ' — paywall OFF'));
+  }
+}
+
+async function monetToggleAll(on) {
+  const res = await monetApi({ action: on ? 'all_on' : 'all_off' });
+  if (res.ok) {
+    monetSites = res.sites;
+    renderMonet();
+    toast(on ? 'Paywall включён на все' : 'Paywall выключен на все');
+  }
+}
+
+// auto-login
+document.getElementById('pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryLogin();
+});
+document.getElementById('grantId').addEventListener('keydown', e => {
+  if (e.key === 'Enter') grantAccess();
+});
+document.getElementById('grantTw').addEventListener('keydown', e => {
+  if (e.key === 'Enter') grantTwitchAccess();
+});
+const saved = localStorage.getItem('admin_pass');
+if (saved) { pass = saved; loadSites(); }
+</script>
+</body>
+</html>
